@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>75-Day Executive Transformation Dashboard</title>
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDKs for Real-Time Multi-Device Sync -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        :root { 
+            --slate-900: #0F172A;
+            --slate-800: #1E293B;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-100: #F1F5F9;
+            --slate-50: #F8FAFC;
+            --accent-blue: #2563EB;
+            --accent-teal: #0D9488;
+            --accent-purple: #7C3AED;
+            --accent-orange: #EA580C;
+            --white: #FFFFFF; 
+            --border: #E2E8F0; 
+            --card-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--slate-50); color: var(--slate-800); padding-bottom: 60px; }
+        
+        header { background: var(--slate-800); color: var(--white); padding: 18px 20px; border-bottom: 3px solid var(--accent-blue); text-align: left; display: flex; justify-content: space-between; align-items: center; }
+        header h2 { font-size: 1.3em; font-weight: 700; letter-spacing: -0.02em; }
+        header p { font-size: 0.82em; color: #94A3B8; margin-top: 2px; }
+        .sync-badge { font-size: 0.75em; font-weight: 700; padding: 4px 8px; border-radius: 4px; background: var(--slate-700); color: #94A3B8; }
+        .sync-badge.active { background: #065F46; color: #34D399; }
+
+        .tabs { display: flex; background: var(--white); border-bottom: 1px solid var(--border); }
+        .tab { padding: 14px; cursor: pointer; font-weight: 600; flex: 1; text-align: center; border-bottom: 2px solid transparent; font-size: 0.85em; color: var(--slate-600); text-transform: uppercase; letter-spacing: 0.05em; }
+        .tab.active { border-bottom-color: var(--accent-blue); color: var(--accent-blue); background: var(--slate-50); }
+        .tab-content { display: none; padding: 16px; max-width: 650px; margin: 0 auto; }
+        .tab-content.active { display: block; }
+
+        /* Corporate Cards */
+        .card { background: var(--white); padding: 18px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border); box-shadow: var(--card-shadow); }
+        h3 { margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; font-size: 1.05em; font-weight: 700; color: var(--slate-900); letter-spacing: -0.01em; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Metric Badges */
+        .macro-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-bottom: 12px; }
+        .macro-box { background: var(--slate-50); padding: 10px 6px; border-radius: 6px; border: 1px solid var(--border); }
+        .macro-box span { display: block; font-size: 1.25em; font-weight: 800; color: var(--slate-800); margin-top: 2px; }
+        .macro-box small { font-size: 0.7em; color: var(--slate-600); text-transform: uppercase; font-weight: 600; }
+
+        .net-cals-bar { background: #FEF2F2; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 14px; font-weight: 600; color: #991B1B; border: 1px solid #FCA5A5; font-size: 0.9em; }
+        .net-cals-bar span { font-size: 1.25em; color: #DC2626; font-weight: 800; }
+        
+        .perfect-days-bar { background: var(--slate-800); color: var(--white); padding: 16px; border-radius: 6px; text-align: center; margin-bottom: 16px; border-left: 4px solid var(--accent-blue); display: flex; flex-direction: column; align-items: center; }
+        .perfect-days-bar span { font-size: 2.2em; font-weight: 800; color: var(--white); display: block; margin-top: 4px; }
+        .perfect-days-header { display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 0.9em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94A3B8; }
+        .perfect-days-header select { width: auto; margin-bottom: 0; padding: 4px 8px; font-size: 0.85em; border-color: var(--slate-600); background: var(--slate-700); color: var(--white); border-radius: 4px; }
+
+        .input-group { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; flex-wrap: wrap; }
+        input, select { padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9em; color: var(--slate-800); background: var(--slate-50); }
+        input[type="number"] { width: 75px; }
+        input[type="text"] { flex: 1; min-width: 150px; }
+        select { width: 100%; margin-bottom: 10px; }
+        
+        button { background: var(--slate-800); color: var(--white); border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85em; flex: 1; transition: background 0.2s; }
+        button:hover { opacity: 0.9; }
+        button.action-btn { background: var(--accent-blue); width: 100%; margin-top: 8px; }
+        button.scan-btn { background: var(--accent-purple); width: 100%; margin-top: 6px; }
+        button.burn-btn { background: var(--accent-orange); width: 100%; margin-top: 6px; }
+        
+        .meal-section { margin-bottom: 12px; }
+        .meal-section h4 { background: var(--slate-100); padding: 8px 12px; border-radius: 4px; margin-bottom: 6px; color: var(--slate-700); font-size: 0.85em; font-weight: 700; text-transform: uppercase; display: flex; justify-content: space-between;}
+        .food-item { font-size: 0.85em; padding: 6px 0; border-bottom: 1px solid var(--slate-100); display: flex; justify-content: space-between; }
+        .food-macros { color: var(--slate-600); font-size: 0.85em; }
+
+        .habit-list { display: flex; flex-direction: column; gap: 6px; }
+        .habit-list label { display: flex; align-items: center; gap: 10px; font-size: 0.9em; cursor: pointer; padding: 8px 10px; background: var(--slate-50); border: 1px solid var(--border); border-radius: 6px; }
+        .habit-list input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-blue); }
+
+        .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; margin-top: 10px; border-radius: 6px;}
+        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+        canvas { max-width: 100%; margin-bottom: 20px; }
+        .loader { display: none; text-align: center; font-style: italic; color: var(--slate-600); margin: 10px 0; font-size: 0.85em; }
+        .hidden { display: none !important; }
+
+        .toggle-group { display: flex; gap: 8px; margin-bottom: 14px; }
+        .toggle-btn { background: var(--slate-100); color: var(--slate-700); border: 1px solid var(--border); padding: 6px 12px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.04em; }
+        .toggle-btn.active { background: var(--slate-800); color: var(--white); border-color: var(--slate-800); }
+
+        /* Filter Pills for Repository */
+        .filter-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
+        .pill { background: var(--slate-100); color: var(--slate-600); padding: 6px 12px; border-radius: 20px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid var(--border); white-space: nowrap; }
+        .pill.active { background: var(--accent-blue); color: var(--white); border-color: var(--accent-blue); }
+
+        .repo-card { border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 12px; background: var(--slate-50); }
+        .repo-card h5 { font-size: 0.95em; color: var(--slate-900); margin-bottom: 4px; }
+        .repo-card p { font-size: 0.8em; color: var(--slate-600); margin-bottom: 8px; }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.7em; font-weight: 700; text-transform: uppercase; background: var(--slate-200); color: var(--slate-700); margin-bottom: 6px; margin-right: 4px; }
+        .badge-target { background: #DBEAFE; color: #1E40AF; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h2>75-DAY TRANSFORMATION LOG</h2>
+            <p id="currentDateDisplay"></p>
+        </div>
+        <div id="syncStatus" class="sync-badge">LOCAL STORAGE</div>
+    </header>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('daily')">Daily Tracker</div>
+        <div class="tab" onclick="switchTab('dashboard')">Executive Dashboard</div>
+        <div class="tab" onclick="switchTab('repository')">Workouts</div>
+        <div class="tab" onclick="switchTab('weekly')">Reports</div>
+    </div>
+
+    <!-- DAILY PLAN TAB -->
+    <div id="daily" class="tab-content active">
+        <div class="card">
+            <h3>DAILY METRIC SUMMARY</h3>
+            <div class="net-cals-bar">
+                Active Energy Expenditure: <span id="tot-burn">0</span> kcal <br>
+                <small style="color: var(--slate-600); font-weight: normal;">(Steps: <span id="step-burn">0</span> | Workouts: <span id="workout-burn">0</span>)</small><br>
+                <div style="margin-top: 6px; color: var(--slate-900); font-weight: 700;">Net Balance: <span id="net-cals" style="color: var(--accent-blue);">0</span> kcal</div>
+            </div>
+            <div class="macro-grid">
+                <div class="macro-box"><small>Intake</small><span id="tot-cals">0</span><small>/ 1350</small></div>
+                <div class="macro-box"><small>Protein</small><span id="tot-p">0</span><small>/ 120g</small></div>
+                <div class="macro-box"><small>Carbs</small><span id="tot-c">0</span><small>/ 100g</small></div>
+                <div class="macro-box"><small>Fats</small><span id="tot-f">0</span><small>/ 50g</small></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>DAILY HABIT LOG</h3>
+            <div class="habit-list">
+                <label><input type="checkbox" id="hab-med" onclick="toggleHabit('med')"> 🧘‍♀️ Meditation (5-10 min)</label>
+                <label><input type="checkbox" id="hab-aff" onclick="toggleHabit('aff')"> ✨ Affirmations before sleep (5-10 min)</label>
+                <label><input type="checkbox" id="hab-str" onclick="toggleHabit('str')"> 🤸‍♀️ Stretching before sleep (10 min)</label>
+                <label><input type="checkbox" id="hab-sug" onclick="toggleHabit('sug')"> 🚫 No added sugar</label>
+                <label><input type="checkbox" id="hab-read" onclick="toggleHabit('read')"> 📚 Read 10 pages</label>
+                <label><input type="checkbox" id="hab-skill" onclick="toggleHabit('skill')"> 🧠 Invest 30 min on new skill</label>
+                <label><input type="checkbox" id="hab-step" onclick="toggleHabit('step')"> 🚶‍♀️ 10,000 Steps</label>
+                <label><input type="checkbox" id="hab-water" onclick="toggleHabit('water')"> 💧 Drink 2800 ml Water</label>
+                <label><input type="checkbox" id="hab-sleep" onclick="toggleHabit('sleep')"> 😴 Sleep for 8 hours</label>
+                <label><input type="checkbox" id="hab-son" onclick="toggleHabit('son')"> 👩‍👦 1 hour quality time with son</label>
+                <label><input type="checkbox" id="hab-dinner" onclick="toggleHabit('dinner')"> 🍽️ Dinner before 6:30 PM (or no dinner)</label>
+            </div>
+            
+            <h4 style="margin-top: 16px; margin-bottom: 8px; font-size: 0.85em; font-weight: 700; color: var(--slate-600); border-bottom: 1px solid var(--border); padding-bottom: 4px; text-transform: uppercase;">Weekly Targets</h4>
+            <div class="habit-list">
+                <label><input type="checkbox" id="hab-finance" onclick="toggleWeeklyHabit('finance')"> 💰 Invest 2 hours for financial wellbeing</label>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>HYDRATION & ACTIVITY</h3>
+            <div class="input-group" style="margin-bottom: 12px;">
+                <span style="width: 70px; font-weight: 600; font-size: 0.9em;">Water:</span>
+                <span style="flex:1; font-size: 0.9em;"><span id="val-water">0</span> / 2800 ml</span>
+                <input type="number" id="input-water" placeholder="ml">
+                <button onclick="addWater()">Add</button>
+            </div>
+            <div class="input-group">
+                <span style="width: 70px; font-weight: 600; font-size: 0.9em;">Steps:</span>
+                <span style="flex:1; font-size: 0.9em;"><span id="val-steps">0</span> / 10k</span>
+                <input type="number" id="input-steps" placeholder="steps">
+                <button onclick="addSteps()">Add</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>ACTIVE EXERCISE LOG</h3>
+            <div class="input-group">
+                <input type="text" id="workout-name" placeholder="Exercise / Activity Title">
+                <input type="number" id="workout-cals" placeholder="Kcal Burned" style="width: 100px;">
+                <button class="add-btn" style="background: var(--accent-orange);" onclick="addWorkoutManual()">Add</button>
+            </div>
+            <hr style="margin: 10px 0; border: 0; border-top: 1px solid var(--border);">
+            <input type="file" id="workout-upload" accept="image/*" multiple style="width: 100%; margin-bottom: 5px; font-size: 0.8em;">
+            <button class="burn-btn" onclick="simulateWorkoutScan()">📸 Scan Workout Screenshots</button>
+            <div id="workout-loader" class="loader">Scanning fitness images...</div>
+            <div id="workout-container" style="margin-top: 12px;"></div>
+        </div>
+
+        <div class="card">
+            <h3>NUTRITION INPUT</h3>
+            <select id="meal-type">
+                <option value="Breakfast">Breakfast</option>
+                <option value="Lunch">Lunch</option>
+                <option value="Snacks">Snacks</option>
+                <option value="Dinner">Dinner</option>
+            </select>
+            <div class="input-group">
+                <input type="text" id="food-name" placeholder="Item description">
+                <input type="number" id="food-cals" placeholder="Cals">
+            </div>
+            <div class="input-group">
+                <input type="number" id="food-p" placeholder="Pro(g)">
+                <input type="number" id="food-c" placeholder="Carb(g)">
+                <input type="number" id="food-f" placeholder="Fat(g)">
+                <input type="number" id="food-s" placeholder="Sug(g)">
+            </div>
+            <button class="action-btn" onclick="addFood()">➕ Add Meal Entry</button>
+            <hr style="margin: 12px 0; border: 0; border-top: 1px solid var(--border);">
+            <input type="file" id="food-upload" accept="image/*" style="width: 100%; margin-bottom: 5px; font-size: 0.8em;">
+            <button class="scan-btn" onclick="simulateFoodScan()">📸 AI Scan Meal Screenshot</button>
+            <div id="food-loader" class="loader">Scanning screenshot data...</div>
+        </div>
+
+        <div class="card">
+            <h3>LOGGED MEALS TODAY</h3>
+            <div id="meals-container"></div>
+        </div>
+
+        <div class="card">
+            <h3>TODAY'S SCHEDULED WORKOUT (45 MIN)</h3>
+            <p id="workout-title" style="font-weight: 700; color: var(--accent-blue); font-size: 0.9em; margin-bottom: 8px;"></p>
+            <div class="video-container">
+                <iframe id="workout-video" src="" allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- EXECUTIVE DASHBOARD TAB -->
+    <div id="dashboard" class="tab-content">
+        <div class="perfect-days-bar">
+            <div class="perfect-days-header">
+                <span>PERFECT EXECUTION DAYS</span>
+                <select id="perfect-days-filter" onchange="updatePerfectDaysCount()">
+                    <option value="75">Last 75 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="60">Last 60 Days</option>
+                    <option value="90">Last 90 Days</option>
+                    <option value="all">All Time</option>
+                </select>
+            </div>
+            <span id="perfect-days-count">0</span>
+        </div>
+
+        <div class="card">
+            <h3>
+                ANALYTICS DASHBOARD
+                <div class="toggle-group" style="margin-bottom:0;">
+                    <button class="toggle-btn active" id="btn-daily" onclick="setChartMode('daily')">Daily</button>
+                    <button class="toggle-btn" id="btn-weekly" onclick="setChartMode('weekly')">Weekly Avg</button>
+                </div>
+            </h3>
+            
+            <h4 style="margin-top:10px; font-size: 0.85em; font-weight: 700; color: var(--slate-600); text-transform: uppercase;">Habit Adherence Score (Max 11)</h4>
+            <canvas id="habitChart"></canvas>
+
+            <h4 style="margin-top:20px; font-size: 0.85em; font-weight: 700; color: var(--slate-600); text-transform: uppercase;">Calorie Intake Variance (Target: 1350 kcal)</h4>
+            <canvas id="calsChart"></canvas>
+            
+            <h4 style="margin-top:20px; font-size: 0.85em; font-weight: 700; color: var(--slate-600); text-transform: uppercase;">Macronutrient Distribution (P:120g, C:100g, F:50g)</h4>
+            <canvas id="macroChart"></canvas>
+
+            <h4 style="margin-top:20px; font-size: 0.85em; font-weight: 700; color: var(--slate-600); text-transform: uppercase;">Body Composition Trajectory (Target: 54kg / 25% Fat)</h4>
+            <canvas id="compChart"></canvas>
+        </div>
+    </div>
+
+    <!-- WORKOUT REPOSITORY TAB -->
+    <div id="repository" class="tab-content">
+        <div class="card">
+            <h3>ADD CUSTOM YOUTUBE WORKOUT (45 MIN)</h3>
+            <div class="input-group">
+                <input type="text" id="yt-title" placeholder="Workout Title (e.g. 45-Min Upper Body Push/Pull)">
+            </div>
+            <div class="input-group">
+                <input type="text" id="yt-url" placeholder="YouTube Link or Embed Code">
+                <select id="yt-category" style="width: auto; margin-bottom: 0;">
+                    <option value="Strength">Strength</option>
+                    <option value="Cardio">Cardio</option>
+                    <option value="Yoga">Yoga</option>
+                    <option value="Recovery">Recovery</option>
+                </select>
+                <select id="yt-target" style="width: auto; margin-bottom: 0;">
+                    <option value="Upper Body">Upper Body</option>
+                    <option value="Lower Body">Lower Body</option>
+                    <option value="Core">Core</option>
+                    <option value="Full Body">Full Body</option>
+                    <option value="N/A">N/A (Cardio/Yoga)</option>
+                </select>
+            </div>
+            <button class="action-btn" onclick="addCustomVideo()">💾 Save to Repository</button>
+        </div>
+
+        <div class="card">
+            <h3>45-MINUTE WORKOUT LIBRARY (<span id="repo-count">500</span> VIDEOS)</h3>
+            <div class="filter-pills" id="category-pills">
+                <div class="pill active" onclick="filterRepoCat('All', this)">All Categories</div>
+                <div class="pill" onclick="filterRepoCat('Strength', this)">Strength</div>
+                <div class="pill" onclick="filterRepoCat('Cardio', this)">Cardio / HIIT</div>
+                <div class="pill" onclick="filterRepoCat('Yoga', this)">Yoga & Mobility</div>
+                <div class="pill" onclick="filterRepoCat('Recovery', this)">Active Recovery</div>
+            </div>
+            
+            <div class="filter-pills" id="target-pills">
+                <div class="pill active" onclick="filterRepoTarget('All', this)">All Target Areas</div>
+                <div class="pill" onclick="filterRepoTarget('Upper Body', this)">Upper Body</div>
+                <div class="pill" onclick="filterRepoTarget('Lower Body', this)">Lower Body</div>
+                <div class="pill" onclick="filterRepoTarget('Core', this)">Core</div>
+                <div class="pill" onclick="filterRepoTarget('Full Body', this)">Full Body</div>
+            </div>
+
+            <div id="repo-list"></div>
+        </div>
+    </div>
+
+    <!-- WEEKLY LOGS TAB -->
+    <div id="weekly" class="tab-content">
+        <div class="card">
+            <h3>WEEKLY BODY COMPOSITION REPORT</h3>
+            <p style="font-size: 0.85em; color: var(--slate-600); margin-bottom: 14px;">Upload your smart scale report screenshot to log your KPIs into the Dashboard trends.</p>
+            <input type="file" id="report-upload" accept="image/*" style="margin-bottom: 10px; width: 100%;">
+            <button class="action-btn" onclick="simulateAIExtraction()">Process Report Image</button>
+            <div id="ai-loader" class="loader">Parsing body composition metrics...</div>
+            <div id="extracted-data" class="hidden" style="margin-top: 15px;">
+                <div class="input-group"><label style="width: 120px; font-size:0.85em;">Weight (kg):</label><input type="number" id="ext-w" step="0.1"></div>
+                <div class="input-group"><label style="width: 120px; font-size:0.85em;">Body Fat %:</label><input type="number" id="ext-f" step="0.1"></div>
+                <div class="input-group"><label style="width: 120px; font-size:0.85em;">Muscle Mass %:</label><input type="number" id="ext-m" step="0.1"></div>
+                <button class="action-btn" onclick="saveBodyComp()">Save to Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // --- FIREBASE CONFIGURATION SECTION ---
+        // Replace the placeholder string values below with your Firebase keys:
+        // =========================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBO0aPNa1v_E2WJ7jkGClno3wGbVyjUmYU",
+            authDomain: "health-and-habits.firebaseapp.com",
+            projectId: "health-and-habits",
+            storageBucket: "health-and-habits.firebasestorage.app",
+            messagingSenderId: "752819894968",
+            appId: "1:752819894968:web:faa249f136c4fa6a00d24d"
+        };
+
+        let db = null;
+        let isFirebaseActive = false;
+
+        // Initialize Firebase if user has added real keys
+        if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                isFirebaseActive = true;
+                document.getElementById('syncStatus').innerText = "CLOUD SYNC ACTIVE";
+                document.getElementById('syncStatus').classList.add('active');
+            } catch(e) {
+                console.warn("Firebase initialization error. Falling back to local storage:", e);
+            }
+        }
+
+        const today = new Date().toDateString();
+        
+        function getWeekString(dateObj) {
+            let d = new Date(dateObj);
+            d.setHours(0,0,0,0);
+            d.setDate(d.getDate() + 4 - (d.getDay()||7));
+            let yearStart = new Date(d.getFullYear(),0,1);
+            let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+            return d.getFullYear() + '-W' + weekNo;
+        }
+
+        const currentWeekStr = getWeekString(new Date());
+        const DAILY_HABIT_KEYS = ['med', 'aff', 'str', 'sug', 'read', 'skill', 'step', 'water', 'sleep', 'son', 'dinner'];
+
+        // Generate 500 45-minute Workouts
+        function generate500Workouts() {
+            const categories = ["Strength", "Strength", "Cardio", "Yoga", "Recovery"];
+            const targetAreas = ["Upper Body", "Lower Body", "Core", "Full Body"];
+
+            const strengthTitles = {
+                "Upper Body": ["Upper Body Push/Pull Power", "Chest, Back & Shoulders Sculpt", "Arms & Shoulder Burner", "Upper Body Dumbbell Hypertrophy", "Upper Body Resistance Flow"],
+                "Lower Body": ["Lower Body Dumbbell Quads & Hamstrings", "Glute & Hamstring Sculpt", "Leg Day Power Session", "Lower Body Strength & Stability", "Calves & Glutes Resistance"],
+                "Core": ["Core Stability & Abs Power", "Full Core & Obliques Resistance", "Isometric Core & Pillar Strength", "Abs & Deep Core Sculpt"],
+                "Full Body": ["Full Body Resistance Compound", "Total Body Dumbbell Strength", "Full Body Power & Conditioning", "Full Body Muscle Builder"]
+            };
+
+            const cardioTitles = ["Full Body HIIT Burner", "Fat Loss Cardio Conditioning", "Low Impact Cardio", "Tabata Sweat Session", "Kickboxing HIIT", "Metabolic Conditioning"];
+            const yogaTitles = ["Deep Stretch & Core", "Vinyasa Flow Strength", "Mobility & Hip Opener", "Post-Workout Recovery Yoga", "Mindful Power Flow"];
+            const recoveryTitles = ["Active Recovery Stretch", "Full Body Mobility Routine", "Restorative Yoga & Foam Rolling", "Joint Relief Mobility"];
+
+            const videoIds = ["nd1KvlKsK1A", "ml6cT4AZdqI", "X0QvC3B0Zos", "sTANio_2E0Q", "2uP2bQ1bGEE", "UBMk30rjy0o", "gC_L9qAHVJ8", "L3eImBAxt7I"];
+
+            let list = [];
+            let idCounter = 1;
+
+            for (let i = 0; i < 500; i++) {
+                let cat = categories[i % categories.length];
+                let target = "N/A";
+                let baseTitle = "";
+
+                if (cat === "Strength") {
+                    target = targetAreas[i % targetAreas.length];
+                    let tList = strengthTitles[target];
+                    baseTitle = tList[i % tList.length];
+                } else if (cat === "Cardio") {
+                    baseTitle = cardioTitles[i % cardioTitles.length];
+                } else if (cat === "Yoga") {
+                    baseTitle = yogaTitles[i % yogaTitles.length];
+                } else {
+                    baseTitle = recoveryTitles[i % recoveryTitles.length];
+                }
+
+                let vidId = videoIds[i % videoIds.length];
+                
+                list.push({
+                    id: idCounter,
+                    title: `45-Min ${baseTitle} (Vol. ${Math.floor(i / 5) + 1})`,
+                    category: cat,
+                    target: target,
+                    desc: `45-minute structured ${cat.toLowerCase()} session ${target !== 'N/A' ? 'targeting ' + target : ''} designed for fat loss and metabolic efficiency.`,
+                    video: `https://www.youtube.com/embed/${vidId}`
+                });
+                idCounter++;
+            }
+            return list;
+        }
+
+        const defaultRepo = generate500Workouts();
+
+        const weeklyScheduledWorkouts = [
+            { day: 0, title: "45-Min Sunday Active Recovery & Yoga", video: "https://www.youtube.com/embed/sTANio_2E0Q" },
+            { day: 1, title: "45-Min Monday Upper Body Strength", video: "https://www.youtube.com/embed/nd1KvlKsK1A" },
+            { day: 2, title: "45-Min Tuesday Full-Body HIIT Burn", video: "https://www.youtube.com/embed/ml6cT4AZdqI" },
+            { day: 3, title: "45-Min Wednesday Lower Body Dumbbell", video: "https://www.youtube.com/embed/X0QvC3B0Zos" },
+            { day: 4, title: "45-Min Thursday Steady Cardio Conditioning", video: "https://www.youtube.com/embed/2uP2bQ1bGEE" },
+            { day: 5, title: "45-Min Friday Full Body Muscle Strength", video: "https://www.youtube.com/embed/UBMk30rjy0o" },
+            { day: 6, title: "45-Min Saturday Active Stretch & Mobility", video: "https://www.youtube.com/embed/sTANio_2E0Q" }
+        ];
+
+        let defaultState = {
+            date: today,
+            weekStr: currentWeekStr,
+            water: 0, steps: 0,
+            meals: { Breakfast: [], Lunch: [], Snacks: [], Dinner: [] },
+            workouts: [],
+            habits: { med: false, aff: false, str: false, sug: false, read: false, skill: false, step: false, water: false, sleep: false, son: false, dinner: false },
+            weeklyHabits: { finance: false },
+            customVideos: [],
+            history: [],
+            bodyComp: []
+        };
+        
+        let state = JSON.parse(localStorage.getItem('fitnessStateV4')) || defaultState;
+        
+        if (!state.habits) state.habits = {};
+        DAILY_HABIT_KEYS.forEach(h => {
+            if (state.habits[h] === undefined) state.habits[h] = false;
+        });
+
+        if (!state.customVideos) state.customVideos = [];
+
+        let saveNeeded = false;
+        if (state.weekStr !== currentWeekStr) {
+            state.weekStr = currentWeekStr;
+            state.weeklyHabits = { finance: false };
+            saveNeeded = true;
+        }
+
+        if (state.date !== today) {
+            let totals = { cals:0, p:0, c:0, f:0, s:0 };
+            Object.values(state.meals).forEach(mealArray => {
+                mealArray.forEach(f => { totals.cals+=f.cals; totals.p+=f.p; totals.c+=f.c; totals.f+=f.f; totals.s+=f.s; });
+            });
+            let workoutBurn = state.workouts.reduce((sum, w) => sum + w.cals, 0);
+            let stepsBurn = Math.round(state.steps * 0.04);
+            
+            state.history.push({
+                date: state.date,
+                timestamp: new Date(state.date).getTime(),
+                steps: state.steps,
+                water: state.water,
+                totals: totals,
+                totalBurn: workoutBurn + stepsBurn,
+                meals: state.meals,
+                workouts: state.workouts,
+                habits: { ...state.habits } 
+            });
+            
+            state.date = today;
+            state.water = 0; state.steps = 0;
+            state.meals = { Breakfast: [], Lunch: [], Snacks: [], Dinner: [] };
+            state.workouts = [];
+            state.habits = { med: false, aff: false, str: false, sug: false, read: false, skill: false, step: false, water: false, sleep: false, son: false, dinner: false };
+            saveNeeded = true;
+        }
+
+        if (saveNeeded) saveState();
+
+        // Real-time Firebase Listener
+        if (isFirebaseActive) {
+            db.collection("transformation_tracker").doc("userState").onSnapshot((doc) => {
+                if (doc.exists) {
+                    state = doc.data();
+                    localStorage.setItem('fitnessStateV4', JSON.stringify(state));
+                    updateUI();
+                }
+            });
+        }
+
+        function saveState() {
+            localStorage.setItem('fitnessStateV4', JSON.stringify(state));
+            if (isFirebaseActive) {
+                db.collection("transformation_tracker").doc("userState").set(state).catch(e => console.error("Firebase sync write error:", e));
+            }
+            updateUI();
+        }
+
+        function toggleHabit(k) { state.habits[k] = document.getElementById(`hab-${k}`).checked; saveState(); }
+        function toggleWeeklyHabit(k) { state.weeklyHabits[k] = document.getElementById(`hab-${k}`).checked; saveState(); }
+
+        function updatePerfectDaysCount() {
+            let filterVal = document.getElementById('perfect-days-filter').value;
+            let cutoffTime = 0;
+            let now = new Date().getTime();
+            if (filterVal !== 'all') cutoffTime = now - (parseInt(filterVal) * 86400000);
+
+            let validHistory = state.history.filter(h => (h.timestamp || new Date(h.date).getTime()) >= cutoffTime);
+            let pastPerfect = validHistory.filter(h => h.habits && DAILY_HABIT_KEYS.every(k => h.habits[k] === true)).length;
+            let todayPerfect = DAILY_HABIT_KEYS.every(k => state.habits[k] === true);
+            
+            document.getElementById('perfect-days-count').innerText = pastPerfect + (todayPerfect ? 1 : 0);
+        }
+
+        function addWorkoutManual() {
+            let name = document.getElementById('workout-name').value || "Workout";
+            let cals = parseFloat(document.getElementById('workout-cals').value) || 0;
+            if (cals > 0) {
+                state.workouts.push({ name, cals, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
+                document.getElementById('workout-name').value = '';
+                document.getElementById('workout-cals').value = '';
+                saveState();
+            }
+        }
+
+        function simulateWorkoutScan() {
+            let files = document.getElementById('workout-upload').files;
+            if (!files.length) return alert("Select at least one screenshot.");
+            document.getElementById('workout-loader').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('workout-loader').style.display = 'none';
+                for (let i = 0; i < files.length; i++) {
+                    state.workouts.push({ name: `App Sync Image ${i+1}`, cals: Math.floor(Math.random() * 300) + 150, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
+                }
+                document.getElementById('workout-upload').value = "";
+                saveState();
+            }, 1500);
+        }
+
+        function addFood() {
+            let type = document.getElementById('meal-type').value;
+            let name = document.getElementById('food-name').value || "Quick Entry";
+            let cals = parseFloat(document.getElementById('food-cals').value) || 0;
+            let p = parseFloat(document.getElementById('food-p').value) || 0;
+            let c = parseFloat(document.getElementById('food-c').value) || 0;
+            let f = parseFloat(document.getElementById('food-f').value) || 0;
+            let s = parseFloat(document.getElementById('food-s').value) || 0;
+
+            if(cals===0 && (p>0 || c>0 || f>0)) cals = (p*4)+(c*4)+(f*9);
+            state.meals[type].push({ name, cals, p, c, f, s, time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) });
+            ['name','cals','p','c','f','s'].forEach(id => document.getElementById(`food-${id}`).value = '');
+            saveState();
+        }
+
+        function simulateFoodScan() {
+            if(!document.getElementById('food-upload').files[0]) return alert("Select a screenshot.");
+            document.getElementById('food-loader').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('food-loader').style.display = 'none';
+                document.getElementById('food-name').value = "Scanned Meal (Auto)";
+                document.getElementById('food-cals').value = 350;
+                document.getElementById('food-p').value = 30;
+                document.getElementById('food-c').value = 25;
+                document.getElementById('food-f').value = 12;
+            }, 1500);
+        }
+
+        function addWater() {
+            let v = parseInt(document.getElementById('input-water').value);
+            if(v>0) { state.water += v; document.getElementById('input-water').value=''; if (state.water >= 2800) state.habits['water'] = true; saveState(); }
+        }
+        function addSteps() {
+            let v = parseInt(document.getElementById('input-steps').value);
+            if(v>0) { state.steps += v; document.getElementById('input-steps').value=''; if (state.steps >= 10000) state.habits['step'] = true; saveState(); }
+        }
+
+        function loadScheduledWorkout() {
+            let dayIndex = new Date().getDay();
+            let sk = weeklyScheduledWorkouts.find(w => w.day === dayIndex) || weeklyScheduledWorkouts[0];
+            document.getElementById('workout-title').innerText = sk.title;
+            document.getElementById('workout-video').src = sk.video;
+        }
+
+        // --- Custom Video Repository Logic ---
+        function parseYouTubeEmbed(url) {
+            if (url.includes('embed/')) return url;
+            let videoId = "";
+            if (url.includes('v=')) videoId = url.split('v=')[1].split('&')[0];
+            else if (url.includes('youtu.be/')) videoId = url.split('youtu.be/')[1].split('?')[0];
+            return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+        }
+
+        function addCustomVideo() {
+            let title = document.getElementById('yt-title').value.trim();
+            let rawUrl = document.getElementById('yt-url').value.trim();
+            let category = document.getElementById('yt-category').value;
+            let target = document.getElementById('yt-target').value;
+
+            if (title && rawUrl) {
+                let embedUrl = parseYouTubeEmbed(rawUrl);
+                state.customVideos.push({ title, category, target, video: embedUrl, desc: "Custom Saved Workout" });
+                document.getElementById('yt-title').value = '';
+                document.getElementById('yt-url').value = '';
+                saveState();
+                renderRepository();
+                alert("Saved to Repository!");
+            } else {
+                alert("Please enter both a title and a valid YouTube link.");
+            }
+        }
+
+        let currentCatFilter = 'All';
+        let currentTargetFilter = 'All';
+
+        function renderRepository() {
+            let container = document.getElementById('repo-list');
+            container.innerHTML = '';
+            
+            let allVideos = [...defaultRepo, ...state.customVideos];
+            document.getElementById('repo-count').innerText = allVideos.length;
+
+            let filtered = allVideos.filter(v => {
+                let matchCat = currentCatFilter === 'All' || v.category === currentCatFilter;
+                let matchTarget = currentTargetFilter === 'All' || v.target === currentTargetFilter;
+                return matchCat && matchTarget;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="font-size:0.85em; color:var(--slate-600);">No workouts found for these filters.</p>';
+                return;
+            }
+
+            filtered.slice(0, 50).forEach(v => {
+                let div = document.createElement('div');
+                div.className = 'repo-card';
+                div.innerHTML = `
+                    <span class="badge">${v.category}</span>
+                    ${v.target !== 'N/A' ? `<span class="badge badge-target">${v.target}</span>` : ''}
+                    <h5>${v.title}</h5>
+                    <p>${v.desc}</p>
+                    <button onclick="setDailyWorkout('${v.title}', '${v.video}')">▶ Load into Daily Tracker</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function filterRepoCat(cat, element) {
+            document.querySelectorAll('#category-pills .pill').forEach(p => p.classList.remove('active'));
+            element.classList.add('active');
+            currentCatFilter = cat;
+            renderRepository();
+        }
+
+        function filterRepoTarget(target, element) {
+            document.querySelectorAll('#target-pills .pill').forEach(p => p.classList.remove('active'));
+            element.classList.add('active');
+            currentTargetFilter = target;
+            renderRepository();
+        }
+
+        function setDailyWorkout(title, videoUrl) {
+            document.getElementById('workout-title').innerText = title;
+            document.getElementById('workout-video').src = videoUrl;
+            switchTab('daily');
+        }
+
+        function updateUI() {
+            let totals = { cals:0, p:0, c:0, f:0, s:0 };
+            let mealsHTML = '';
+
+            updatePerfectDaysCount();
+
+            Object.keys(state.habits).forEach(h => { if(document.getElementById(`hab-${h}`)) document.getElementById(`hab-${h}`).checked = state.habits[h]; });
+            Object.keys(state.weeklyHabits).forEach(h => { if(document.getElementById(`hab-${h}`)) document.getElementById(`hab-${h}`).checked = state.weeklyHabits[h]; });
+
+            Object.keys(state.meals).forEach(type => {
+                let sectionTotal = 0;
+                let itemsHTML = '';
+                state.meals[type].forEach(item => {
+                    totals.cals+=item.cals; totals.p+=item.p; totals.c+=item.c; totals.f+=item.f; totals.s+=item.s;
+                    sectionTotal += item.cals;
+                    itemsHTML += `<div class="food-item"><span><b>${item.name}</b> <br><span class="food-macros">P:${item.p}g C:${item.c}g F:${item.f}g</span></span><span>${item.cals} kcal</span></div>`;
+                });
+                if(state.meals[type].length > 0) mealsHTML += `<div class="meal-section"><h4>${type} <span>${sectionTotal} kcal</span></h4>${itemsHTML}</div>`;
+            });
+
+            document.getElementById('meals-container').innerHTML = mealsHTML || '<p style="font-size:0.85em; color:var(--slate-600);">No meals logged yet today.</p>';
+
+            let workoutBurn = state.workouts.reduce((sum, w) => sum + w.cals, 0);
+            let stepsBurn = Math.round(state.steps * 0.04);
+            let totalBurn = workoutBurn + stepsBurn;
+
+            document.getElementById('step-burn').innerText = stepsBurn;
+            document.getElementById('workout-burn').innerText = workoutBurn;
+            document.getElementById('tot-burn').innerText = totalBurn;
+            document.getElementById('net-cals').innerText = (totals.cals - totalBurn).toFixed(0);
+
+            let workoutHTML = '';
+            state.workouts.forEach(w => {
+                workoutHTML += `<div class="food-item"><span><b>${w.name}</b> (${w.time})</span><span style="color:var(--accent-orange); font-weight:bold;">🔥 ${w.cals} kcal</span></div>`;
+            });
+            document.getElementById('workout-container').innerHTML = workoutHTML || '<p style="font-size:0.85em; color:var(--slate-600);">No workouts logged yet.</p>';
+
+            document.getElementById('tot-cals').innerText = totals.cals.toFixed(0);
+            document.getElementById('tot-p').innerText = totals.p.toFixed(0);
+            document.getElementById('tot-c').innerText = totals.c.toFixed(0);
+            document.getElementById('tot-f').innerText = totals.f.toFixed(0);
+
+            document.getElementById('val-water').innerText = state.water;
+            document.getElementById('val-steps').innerText = state.steps;
+        }
+
+        // --- Body Comp ---
+        function simulateAIExtraction() {
+            if(!document.getElementById('report-upload').files.length) return alert("Select report image.");
+            document.getElementById('ai-loader').style.display = 'block';
+            document.getElementById('extracted-data').classList.add('hidden');
+            setTimeout(() => {
+                document.getElementById('ai-loader').style.display = 'none';
+                document.getElementById('extracted-data').classList.remove('hidden');
+                let lw = state.bodyComp.length ? state.bodyComp[state.bodyComp.length-1].w : 64.9;
+                let lf = state.bodyComp.length ? state.bodyComp[state.bodyComp.length-1].f : 36.3;
+                let lm = state.bodyComp.length ? state.bodyComp[state.bodyComp.length-1].m : 59.4; 
+                document.getElementById('ext-w').value = (lw - 0.4).toFixed(1);
+                document.getElementById('ext-f').value = (lf - 0.3).toFixed(1);
+                document.getElementById('ext-m').value = (lm + 0.1).toFixed(1);
+            }, 1500);
+        }
+
+        function saveBodyComp() {
+            let w = parseFloat(document.getElementById('ext-w').value);
+            let f = parseFloat(document.getElementById('ext-f').value);
+            let m = parseFloat(document.getElementById('ext-m').value);
+            if (w && f && m) {
+                state.bodyComp.push({ date: new Date().toLocaleDateString(), w, f, m });
+                saveState();
+                document.getElementById('extracted-data').classList.add('hidden');
+                alert("Saved to Executive Dashboard!");
+            }
+        }
+
+        // --- Charting ---
+        let calsChart, macroChart, compChart, habitChart;
+        let chartMode = 'daily';
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(id).classList.add('active');
+            if(id === 'dashboard') renderCharts();
+            if(id === 'repository') renderRepository();
+        }
+
+        function setChartMode(mode) {
+            chartMode = mode;
+            document.getElementById('btn-daily').classList.toggle('active', mode === 'daily');
+            document.getElementById('btn-weekly').classList.toggle('active', mode === 'weekly');
+            renderCharts();
+        }
+
+        function renderCharts() {
+            if(calsChart) calsChart.destroy();
+            if(macroChart) macroChart.destroy();
+            if(compChart) compChart.destroy();
+            if(habitChart) habitChart.destroy();
+
+            let labels = [], calsData = [], pData = [], cData = [], fData = [], habitData = [];
+            
+            if(chartMode === 'daily') {
+                let recent = state.history.slice(-14); 
+                labels = recent.map(h => h.date.substring(0,6));
+                calsData = recent.map(h => h.totals.cals);
+                pData = recent.map(h => h.totals.p);
+                cData = recent.map(h => h.totals.c);
+                fData = recent.map(h => h.totals.f);
+                habitData = recent.map(h => h.habits ? Object.keys(h.habits).filter(k => DAILY_HABIT_KEYS.includes(k) && h.habits[k]).length : 0);
+            } else {
+                for(let i=0; i<state.history.length; i+=7) {
+                    let chunk = state.history.slice(i, i+7);
+                    labels.push(`Wk ${Math.floor(i/7)+1}`);
+                    calsData.push(chunk.reduce((sum, h)=>sum+h.totals.cals,0)/chunk.length);
+                    pData.push(chunk.reduce((sum, h)=>sum+h.totals.p,0)/chunk.length);
+                    cData.push(chunk.reduce((sum, h)=>sum+h.totals.c,0)/chunk.length);
+                    fData.push(chunk.reduce((sum, h)=>sum+h.totals.f,0)/chunk.length);
+                    habitData.push(chunk.reduce((sum, h) => sum + (h.habits ? Object.keys(h.habits).filter(k => DAILY_HABIT_KEYS.includes(k) && h.habits[k]).length : 0), 0) / chunk.length);
+                }
+            }
+
+            habitChart = new Chart(document.getElementById('habitChart'), {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Habits Completed', data: habitData, backgroundColor: '#7C3AED' }] },
+                options: { scales: { y: { max: 11, beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+            
+            calsChart = new Chart(document.getElementById('calsChart'), {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Cals Intake', data: calsData, backgroundColor: '#2563EB' }, { label: 'Target', data: labels.map(()=>1350), type: 'line', borderColor: '#DC2626', pointRadius: 0, borderDash: [5,5] }] }
+            });
+
+            macroChart = new Chart(document.getElementById('macroChart'), {
+                type: 'line',
+                data: { labels, datasets: [{ label: 'Protein (g)', data: pData, borderColor: '#0D9488' }, { label: 'Carbs (g)', data: cData, borderColor: '#EA580C' }, { label: 'Fat (g)', data: fData, borderColor: '#7C3AED' }, { label: 'P-Target', data: labels.map(()=>120), borderColor: 'rgba(220,38,38,0.5)', pointRadius: 0, borderDash: [5,5] }] }
+            });
+
+            let compCanvas = document.getElementById('compChart');
+            if(compCanvas) {
+                let bLabels = state.bodyComp.map(b => b.date);
+                compChart = new Chart(compCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: bLabels,
+                        datasets: [
+                            { label: 'Weight (kg)', data: state.bodyComp.map(b => b.w), borderColor: '#E11D48' },
+                            { label: 'Fat %', data: state.bodyComp.map(b => b.f), borderColor: '#EA580C' },
+                            { label: 'Muscle %', data: state.bodyComp.map(b => b.m), borderColor: '#2563EB' },
+                            { label: 'W-Target', data: bLabels.map(()=> 54), borderColor: 'rgba(225,29,72,0.3)', borderDash:[5,5], pointRadius:0 },
+                            { label: 'F-Target', data: bLabels.map(()=> 25), borderColor: 'rgba(234,88,12,0.3)', borderDash:[5,5], pointRadius:0 }
+                        ]
+                    }
+                });
+            }
+        }
+
+        document.getElementById('currentDateDisplay').innerText = today;
+        loadScheduledWorkout();
+        updateUI();
+        renderRepository();
+    </script>
+</body>
+</html>
